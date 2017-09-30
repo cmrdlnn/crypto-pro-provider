@@ -1,37 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>JSDoc: Source: index.js</title>
-
-    <script src="scripts/prettify/prettify.js"> </script>
-    <script src="scripts/prettify/lang-css.js"> </script>
-    <!--[if lt IE 9]>
-      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
-    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
-</head>
-
-<body>
-
-<div id="main">
-
-    <h1 class="page-title">Source: index.js</h1>
-
-    
-
-
-
-    
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>require('../vendor/cadesplugin_api');
+// require('../vendor/cadesplugin_api');
 
 /**
   * @name CryptoProProvider
   * @description Module provide methods for signing requests with Crypto Pro
-  * @author Vitaly Mashanov &lt;vvmashanov@yandex.ru>
+  * @author Vitaly Mashanov <vvmashanov@yandex.ru>
   */
 
 /**
@@ -75,9 +47,7 @@ const cadesplugin = window.cadesplugin;
   * @description Checking, which method used by browser (Async or NPAPI)
   * @return {boolean}
   */
-const isAsync = () => {
-  return cadesplugin.CreateObjectAsync ? true : false
-}
+const _isAsync = () => cadesplugin.CreateObjectAsync ? true : false
 
 /**
   * @function
@@ -85,10 +55,8 @@ const isAsync = () => {
   * @description Provides access to loaded certificates for browser
   * @return {array} list of certificates
   */
-const certificates = () => {
+const _certificates = () => {
   return new Promise((resolve, reject) => {
-    const certificates_array = new Array();
-
     try {
       const store = cadesplugin.CreateObject("CAPICOM.Store");
       store.Open();
@@ -96,25 +64,7 @@ const certificates = () => {
       const certificates = store.Certificates;
       const count = certificates.Count;
 
-      for (let i = 1; i &lt;= count; i++) {
-        try {
-          const certificate = certificates.Item(i);
-          const is_valid = certificate.IsValid();
-
-          certificates_array.push({
-            issuer_name: _convertStringToObj(certificate.IssuerName),
-            serial_number: certificate.SerialNumber,
-            subject_name: _convertStringToObj(certificate.SubjectName),
-            thumbprint: certificate.Thumbprint,
-            valid_from_date: certificate.ValidFromDate,
-            valid_to_date: certificate.ValidToDate,
-            is_valid: is_valid.Result,
-            version: certificate.Version
-          });
-        } catch(err) {
-          console.error(err);
-        }
-      }
+      const certificates_array = _prepareCertificates(certificates, [], count, 1, _prepareValue)
 
       store.Close();
 
@@ -131,46 +81,23 @@ const certificates = () => {
   * @description Provides access to loaded certificates for browser (Async)
   * @return {array} list of certificates
   */
-const certificatesAsync = () => {
+const _certificatesAsync = () => {
   return new Promise((resolve, reject) => {
-    cadesplugin.async_spawn(function *(args) {
-      const certificates_array = new Array();
+    try {
+      const store = _prepareValueAsync(cadesplugin.CreateObjectAsync("CAPICOM.Store"));
+      _prepareValueAsync(store.Open());
 
-      try {
-        const store = yield cadesplugin.CreateObjectAsync("CAPICOM.Store");
-        yield store.Open();
+      const certificates = _prepareValueAsync(store.Certificates);
+      const count = _prepareValueAsync(certificates.Count);
 
-        const certificates = yield store.Certificates;
-        const count = yield certificates.Count;
+      const certificates_array = _prepareCertificates(certificates, [], count, 1, _prepareValueAsync)
 
-        for (let i = 1; i &lt;= count; i++) {
-          try {
-            const certificate = yield certificates.Item(i);
-            const is_valid = yield certificate.IsValid();
+      _prepareValueAsync(store.Close());
 
-            certificates_array.push({
-              issuer_name: _convertStringToObj(yield certificate.IssuerName),
-              serial_number: yield certificate.SerialNumber,
-              subject_name: _convertStringToObj(yield certificate.SubjectName),
-              thumbprint: yield certificate.Thumbprint,
-              private_key: yield certificate.PrivateKey,
-              valid_from_date: yield certificate.ValidFromDate,
-              valid_to_date: yield certificate.ValidToDate,
-              is_valid: yield is_valid.Result,
-              version: yield certificate.Version
-            });
-          } catch(err) {
-            console.error(err);
-          }
-        }
-
-        yield store.Close();
-
-        args[0](certificates_array);
-      } catch (err) {
-        args[1](cadesplugin.getLastError(err));
-      }
-    }, resolve, reject);
+      resolve(certificates_array);
+    } catch(err) {
+      reject(cadesplugin.getLastError(err));
+    }
   });
 }
 
@@ -182,7 +109,7 @@ const certificatesAsync = () => {
   * @param {string} base64 - xml document or file encoded to base64
   * @return {promise} signature
   */
-const sign = (thumbprint, base64) => {
+const _sign = (thumbprint, base64) => {
   return new Promise(function (resolve, reject) {
     try {
       const store = cadesplugin.CreateObject("CAPICOM.Store");
@@ -227,7 +154,7 @@ const sign = (thumbprint, base64) => {
   * @param {string} base64 - xml document or file encoded to base64
   * @return {promise} signature
   */
-const signAsync = (thumbprint, base64) => {
+const _signAsync = (thumbprint, base64) => {
   return new Promise(function (resolve, reject) {
     cadesplugin.async_spawn(function *(args) {
       try {
@@ -270,7 +197,7 @@ const signAsync = (thumbprint, base64) => {
   * @param {string} base64 - SignedInfo of signature template encoded to base64
   * @return {promise} signature value and certificate value
   */
-const paramsForDetachedSignature = (thumbprint, base64) => {
+const _paramsForDetachedSignature = (thumbprint, base64) => {
   return new Promise(function (resolve, reject) {
     try {
       const hashedData = cadesplugin.CreateObject("CAdESCOM.HashedData");
@@ -315,7 +242,7 @@ const paramsForDetachedSignature = (thumbprint, base64) => {
   * @param {string} base64 - SignedInfo of signature template encoded to base64
   * @return {promise} signature value and certificate value
   */
-const paramsForDetachedSignatureAsync = (thumbprint, base64) => {
+const _paramsForDetachedSignatureAsync = (thumbprint, base64) => {
   return new Promise((resolve, reject) => {
     cadesplugin.async_spawn(function *(args) {
       try {
@@ -395,31 +322,35 @@ const _hexToBase64 = (hex, str, index) => {
   return window.btoa(str);
 }
 
-return {
-  certificates: isAsync() ? certificatesAsync : certificates,
-  sign: isAsync() ? signAsync : sign,
-  paramsForDetachedSignature: isAsync() ? paramsForDetachedSignatureAsync : paramsForDetachedSignature
+const _prepareValue = (value) => value
+
+const _prepareValueAsync = async (value) => await value
+
+const _prepareCertificates = (certificates, list, size, index, prepareValue) => {
+  if (index <= size) {
+    try {
+      const certificate = certificates.Item(index);
+      const is_valid = certificate.IsValid();
+
+      list.concat({
+        issuer_name: _convertStringToObj(prepareValue(certificate.IssuerName)),
+        serial_number: prepareValue(certificate.SerialNumber),
+        subject_name: _convertStringToObj(prepareValue(certificate.SubjectName)),
+        thumbprint: prepareValue(certificate.Thumbprint),
+        private_key: prepareValue(certificate.PrivateKey),
+        valid_from_date: prepareValue(certificate.ValidFromDate),
+        valid_to_date: prepareValue(certificate.ValidToDate),
+        is_valid: prepareValue(is_valid.Result),
+        version: prepareValue(certificate.Version)
+      });
+    } catch(err) { console.error(err) }
+
+    return _prepareCertificates(certificates, list, size, index + 1, prepareValue);
+  }
+
+  return list;
 }
-</code></pre>
-        </article>
-    </section>
 
-
-
-
-</div>
-
-<nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#_convertStringToObj">_convertStringToObj</a></li><li><a href="global.html#_hexToBase64">_hexToBase64</a></li><li><a href="global.html#CADESCOM_BASE64_TO_BINARY">CADESCOM_BASE64_TO_BINARY</a></li><li><a href="global.html#CADESCOM_CADES_BES">CADESCOM_CADES_BES</a></li><li><a href="global.html#CADESCOM_HASH_ALGORITHM_CP_GOST_3411">CADESCOM_HASH_ALGORITHM_CP_GOST_3411</a></li><li><a href="global.html#cadesplugin">cadesplugin</a></li><li><a href="global.html#CAPICOM_CERTIFICATE_FIND_SHA1_HASH">CAPICOM_CERTIFICATE_FIND_SHA1_HASH</a></li><li><a href="global.html#certificates">certificates</a></li><li><a href="global.html#certificatesAsync">certificatesAsync</a></li><li><a href="global.html#CryptoProProvider">CryptoProProvider</a></li><li><a href="global.html#isAsync">isAsync</a></li><li><a href="global.html#paramsForDetachedSignature">paramsForDetachedSignature</a></li><li><a href="global.html#paramsForDetachedSignatureAsync">paramsForDetachedSignatureAsync</a></li><li><a href="global.html#sign">sign</a></li><li><a href="global.html#signAsync">signAsync</a></li></ul>
-</nav>
-
-<br class="clear">
-
-<footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.4</a> on Thu Sep 28 2017 20:38:18 GMT+0300 (MSK)
-</footer>
-
-<script> prettyPrint(); </script>
-<script src="scripts/linenumber.js"> </script>
-</body>
-</html>
+export const Certificates = () => _isAsync() ? _certificatesAsync : _certificates
+export const Sign = () => _isAsync() ? _signAsync : _sign
+export const ParamsForDetachedSignature = () => _isAsync() ? _paramsForDetachedSignatureAsync : _paramsForDetachedSignature
